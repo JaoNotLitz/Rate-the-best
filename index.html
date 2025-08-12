@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qual é o Melhor?</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .choice-card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .choice-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        /* Animação de fade-in para as telas */
+        .view {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
+
+    <div id="app" class="w-full max-w-2xl mx-auto text-center">
+
+        <!-- TELA 1: ENTRADA DE DADOS -->
+        <div id="input-view" class="view space-y-6 bg-gray-800 p-8 rounded-xl shadow-2xl">
+            <h1 class="text-4xl font-bold text-cyan-400">Qual é o Melhor?</h1>
+            <p class="text-gray-300">Cole ou digite sua lista de itens abaixo, um por linha. Nós vamos embaralhar e te ajudar a criar um ranking através de comparações em pares.</p>
+            <textarea id="item-input" class="w-full h-48 bg-gray-900 border-2 border-gray-700 rounded-lg p-4 text-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 resize-none" placeholder="Exemplo:&#10;Pizza&#10;Hambúrguer&#10;Sushi&#10;Churrasco"></textarea>
+            <button id="start-button" class="w-full bg-cyan-500 hover:bg-cyan-600 text-gray-900 font-bold py-4 px-6 rounded-lg text-xl shadow-lg transition-transform transform hover:scale-105">
+                Iniciar Ranking
+            </button>
+            <p id="error-message" class="text-red-400 h-4"></p>
+        </div>
+
+        <!-- TELA 2: COMPARAÇÃO -->
+        <div id="comparison-view" class="view hidden space-y-6">
+            <h2 id="progress-text" class="text-2xl font-semibold text-gray-300">Qual você prefere?</h2>
+            <div id="comparison-container" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- As opções serão inseridas aqui pelo JS -->
+            </div>
+             <div class="w-full bg-gray-700 rounded-full h-2.5 mt-4">
+                <div id="progress-bar" class="bg-cyan-400 h-2.5 rounded-full" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- TELA 3: RESULTADOS -->
+        <div id="results-view" class="view hidden space-y-8">
+            <h1 class="text-4xl font-bold text-cyan-400">Ranking Final!</h1>
+            
+            <!-- Pódio -->
+            <div class="grid grid-cols-3 items-end gap-4 px-4">
+                <!-- 2º Lugar -->
+                <div class="order-2 bg-gray-700 p-4 rounded-lg shadow-lg border-2 border-gray-500">
+                    <div class="text-4xl">🥈</div>
+                    <h3 id="podium-2" class="text-xl font-bold mt-2"></h3>
+                </div>
+                <!-- 1º Lugar -->
+                <div class="order-1 bg-yellow-500 text-gray-900 p-6 rounded-t-lg shadow-xl border-2 border-yellow-300">
+                    <div class="text-5xl">🥇</div>
+                    <h2 id="podium-1" class="text-2xl font-extrabold mt-2"></h2>
+                </div>
+                <!-- 3º Lugar -->
+                <div class="order-3 bg-orange-600 p-3 rounded-lg shadow-md border-2 border-orange-400">
+                    <div class="text-3xl">🥉</div>
+                    <h4 id="podium-3" class="text-lg font-bold mt-2"></h4>
+                </div>
+            </div>
+
+            <!-- Demais posições -->
+            <div class="bg-gray-800 p-6 rounded-xl shadow-inner">
+                <h2 class="text-2xl font-semibold mb-4 text-left">Demais Posições</h2>
+                <ol id="ranked-list" class="text-left space-y-2 text-lg list-decimal list-inside text-gray-300">
+                    <!-- A lista será preenchida aqui -->
+                </ol>
+            </div>
+
+            <button id="restart-button" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition-transform transform hover:scale-105">
+                Começar Novamente
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Elementos da UI
+            const inputView = document.getElementById('input-view');
+            const comparisonView = document.getElementById('comparison-view');
+            const resultsView = document.getElementById('results-view');
+            
+            const itemInput = document.getElementById('item-input');
+            const startButton = document.getElementById('start-button');
+            const restartButton = document.getElementById('restart-button');
+            const errorMessage = document.getElementById('error-message');
+            
+            const comparisonContainer = document.getElementById('comparison-container');
+            const progressText = document.getElementById('progress-text');
+            const progressBar = document.getElementById('progress-bar');
+
+            // Estado da aplicação
+            let originalItems = [];
+            let comparisonQueue = [];
+            let leftSublist = [];
+            let rightSublist = [];
+            let mergedList = [];
+            let totalComparisons = 0;
+            let comparisonsDone = 0;
+
+            // --- LÓGICA PRINCIPAL (ALGORITMO MERGE SORT INTERATIVO) ---
+
+            function startGame() {
+                const itemsText = itemInput.value;
+                const items = itemsText.split('\n').map(item => item.trim()).filter(item => item.length > 0);
+
+                if (items.length < 2) {
+                    errorMessage.textContent = 'Por favor, insira pelo menos 2 itens.';
+                    return;
+                }
+                errorMessage.textContent = '';
+                
+                originalItems = [...items];
+                // 1. Embaralhar a lista inicial para garantir imparcialidade
+                shuffleArray(items);
+
+                // 2. Preparar a fila de comparação para o Merge Sort
+                // Cada item começa em sua própria sub-lista
+                comparisonQueue = items.map(item => [item]);
+                
+                // Estimativa de comparações para a barra de progresso
+                totalComparisons = calculateMaxComparisons(originalItems.length);
+                comparisonsDone = 0;
+                updateProgressBar();
+
+                // 3. Mudar para a tela de comparação e iniciar o processo
+                inputView.classList.add('hidden');
+                comparisonView.classList.remove('hidden');
+                resultsView.classList.add('hidden');
+                
+                processNextComparison();
+            }
+
+            function processNextComparison() {
+                // Se não há sub-listas ativas, pega as próximas da fila
+                if (leftSublist.length === 0 && rightSublist.length === 0) {
+                    // CONDIÇÃO DE TÉRMINO: Se só sobrou uma lista na fila, ela está ordenada!
+                    if (comparisonQueue.length <= 1) {
+                        showResults();
+                        return;
+                    }
+                    
+                    // Pega as duas próximas sub-listas da fila para mesclar
+                    leftSublist = comparisonQueue.shift();
+                    rightSublist = comparisonQueue.shift();
+                    mergedList = [];
+                }
+
+                // Apresenta o par para comparação
+                const item1 = leftSublist[0];
+                const item2 = rightSublist[0];
+                
+                displayPair(item1, item2);
+            }
+
+            function handleChoice(chosenItem) {
+                comparisonsDone++;
+                updateProgressBar();
+
+                const item1 = leftSublist[0];
+                
+                // Adiciona o item escolhido à lista mesclada e o remove da sua sub-lista original
+                if (chosenItem === item1) {
+                    mergedList.push(leftSublist.shift());
+                } else {
+                    mergedList.push(rightSublist.shift());
+                }
+
+                // Verifica se uma das sub-listas acabou
+                if (leftSublist.length === 0) {
+                    // Se a da esquerda acabou, anexa todo o resto da direita
+                    mergedList.push(...rightSublist);
+                    rightSublist = []; // Esvazia
+                } else if (rightSublist.length === 0) {
+                    // Se a da direita acabou, anexa todo o resto da esquerda
+                    mergedList.push(...leftSublist);
+                    leftSublist = []; // Esvazia
+                }
+
+                // Se ambas as sub-listas foram esvaziadas, a mesclagem terminou
+                if (leftSublist.length === 0 && rightSublist.length === 0) {
+                    // Adiciona a lista recém-mesclada e ordenada de volta ao final da fila
+                    comparisonQueue.push(mergedList);
+                    mergedList = [];
+                }
+
+                // Continua para a próxima comparação
+                processNextComparison();
+            }
+
+            function showResults() {
+                const finalRanking = comparisonQueue[0] || [];
+                
+                // Preencher o pódio
+                document.getElementById('podium-1').textContent = finalRanking[0] || '';
+                document.getElementById('podium-2').textContent = finalRanking[1] || '';
+                document.getElementById('podium-3').textContent = finalRanking[2] || '';
+
+                // Preencher o resto da lista
+                const rankedList = document.getElementById('ranked-list');
+                rankedList.innerHTML = ''; // Limpa a lista anterior
+                
+                finalRanking.slice(3).forEach((item, index) => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span class="font-semibold text-gray-500 mr-2">${index + 4}.</span> ${item}`;
+                    rankedList.appendChild(li);
+                });
+
+                // Mudar para a tela de resultados
+                comparisonView.classList.add('hidden');
+                resultsView.classList.remove('hidden');
+            }
+
+            function resetGame() {
+                // Reseta todo o estado
+                originalItems = [];
+                comparisonQueue = [];
+                leftSublist = [];
+                rightSublist = [];
+                mergedList = [];
+                itemInput.value = '';
+
+                // Volta para a tela inicial
+                resultsView.classList.add('hidden');
+                inputView.classList.remove('hidden');
+            }
+
+            // --- FUNÇÕES AUXILIARES ---
+
+            function displayPair(item1, item2) {
+                comparisonContainer.innerHTML = ''; // Limpa as opções anteriores
+                
+                const card1 = createChoiceCard(item1);
+                const card2 = createChoiceCard(item2);
+
+                comparisonContainer.appendChild(card1);
+                comparisonContainer.appendChild(card2);
+            }
+
+            function createChoiceCard(item) {
+                const card = document.createElement('button');
+                card.className = 'choice-card w-full bg-gray-800 p-8 md:p-12 rounded-lg text-2xl font-bold border-2 border-gray-700 hover:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400';
+                card.textContent = item;
+                card.onclick = () => handleChoice(item);
+                return card;
+            }
+            
+            function updateProgressBar() {
+                const progress = totalComparisons > 0 ? (comparisonsDone / totalComparisons) * 100 : 0;
+                progressBar.style.width = `${Math.min(progress, 100)}%`;
+                progressText.textContent = `Comparação ${comparisonsDone + 1} de ~${totalComparisons}`;
+            }
+            
+            // Algoritmo de Fisher-Yates para embaralhar
+            function shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+            }
+            
+            // Estima o número máximo de comparações para o Merge Sort (N log N)
+            function calculateMaxComparisons(n) {
+                if (n <= 1) return 0;
+                return Math.ceil(n * Math.log2(n));
+            }
+
+            // Event Listeners
+            startButton.addEventListener('click', startGame);
+            restartButton.addEventListener('click', resetGame);
+            itemInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                    startGame();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
